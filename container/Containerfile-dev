@@ -1,0 +1,16 @@
+# vim: set syntax=dockerfile:
+
+FROM alpine:3.15
+
+RUN echo "http://openresty.org/package/alpine/v3.15/main" >> /etc/apk/repositories \
+	&& wget 'http://openresty.org/package/admin@openresty.com-5ea678a6.rsa.pub' -O /etc/apk/keys/admin@openresty.com-5ea678a6.rsa.pub \
+	&& apk add --no-cache luarocks5.1 lua-inspect openresty gcc musl-dev openssl-dev lua5.1-dev lua-resty-http
+
+RUN luarocks-5.1 install lapis
+
+COPY container/nginx-dev.conf /usr/local/openresty/nginx/conf/nginx.conf
+COPY . /opt/app
+
+WORKDIR /opt/app
+
+CMD /usr/local/openresty/nginx/sbin/nginx -g 'daemon off; master_process on;'

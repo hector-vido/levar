@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: levar
+    app.openshift.io/runtime: phalcon
+  name: levar
+  namespace: alert-receiver
+spec:
+  selector:
+    matchLabels:
+      app: levar
+  template:
+    metadata:
+      labels:
+        app: levar
+    spec:
+      containers:
+      - envFrom:
+        - secretRef:
+            name: levar
+        image: image-registry.openshift-image-registry.svc:5000/redhat-alerts/levar
+        imagePullPolicy: Always
+        name: levar
+        ports:
+        - containerPort: 8080
+          protocol: TCP
