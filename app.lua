@@ -25,7 +25,6 @@ end)
 app:post('/', json_params(function(self)
 
 	local alert = self.params
-	local status = alert.status == 'firing' and icons.fire or icons.smile
 
 	local httpc = require("resty.http").new()
 	httpc:set_proxy_options({
@@ -34,38 +33,42 @@ app:post('/', json_params(function(self)
 		no_proxy = os.getenv('NO_PROXY')
 	})
 
-	local res, err = httpc:request_uri(uri, {
-		method = "POST",
-		body = cjson.encode({
-			chat_id = chat_id,
-			parse_mode = 'Markdown',
-			text = string.format('*%s* %s\n*Namespace: *%s\n%s',
-				alert.commonLabels.alertname,
-				status,
-				alert.commonLabels.namespace,
-				alert.commonAnnotations.summary
-			)
-		}),
-		headers = {["Content-Type"] = "application/json"},
-		ssl_verify = false
-	})
+	for k,v in ipairs(alert.alerts) do
+		ngx.log(ngx.NOTICE, cjson.encode(v))
+		local status = v.status == 'firing' and icons.fire or icons.smile
+		local res, err = httpc:request_uri(uri, {
+			method = "POST",
+			body = cjson.encode({
+				chat_id = chat_id,
+				parse_mode = 'Markdown',
+				text = string.format('*%s* %s\n*Where:* %s\n%s',
+					v.labels.alertname,
+					status,
+					v.labels.namespace or v.labels.node or 'cluster',
+					v.annotations.summary or v.annotations.message:match('^.-%.%s') or v.annotations.message:match('^.+%.$')
+				)
+			}),
+			headers = {["Content-Type"] = "application/json"},
+			ssl_verify = false
+		})
+		if not res then
+			httpc:close()
+			ngx.log(ngx.ERR, err)
+			return {{ json = err }, status = 500 }
+		elseif res.status ~= 200 then
+			httpc:close()
+			ngx.log(ngx.ERR, res.body)
+			return { json = res.body, status = res.status }
+		end
+	end
 
 	httpc:close()
-
-	if not res then
-		ngx.log(ngx.ERR, err)
-		return {{ json = err }, status = 500 }
-	elseif res.status ~= 200 then
-		ngx.log(ngx.ERR, res.body)
-		return { json = res.body, status = res.status }
-	else
-		return { json = res }
-	end
+	return { json = { message = 'Alert sent.' } }
 end))
 
 function app:handle_error(err, trace)
 	ngx.log(ngx.ERR, err, trace)
-	return { json = {message = "An error happened, please see the logs"}, status = 500 }
+	return { json = {message = 'An error happened, please see the logs'}, status = 500 }
 end
 
 return app
