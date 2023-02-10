@@ -33,6 +33,11 @@ app:post('/', json_params(function(self)
 		no_proxy = os.getenv('NO_PROXY')
 	})
 
+	if next(alert) == nil then
+		ngx.log(ngx.NOTICE, 'Empty body received, ignoring.')
+		return { json = { message = 'Empty body received, ignoring.' } }
+	end
+
 	for k,v in ipairs(alert.alerts) do
 		ngx.log(ngx.NOTICE, cjson.encode(v))
 		local status = v.status == 'firing' and icons.fire or icons.smile
